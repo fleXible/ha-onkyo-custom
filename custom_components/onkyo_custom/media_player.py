@@ -24,13 +24,9 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
 
         for device in devices:
             original_class = device.__class__.__name__
-            if original_class == 'OnkyoDeviceZone':
-                _LOGGER.debug(f'Skipping transform for original_class={original_class}')
-                custom_devices.append(device)
-            else:
-                custom_class = globals().get(f'Custom{original_class}')
-                _LOGGER.debug(f'Transformed original_class={original_class} into custom_class={custom_class}')
-                custom_devices.append(custom_class(device))
+            custom_class = globals().get(f'Custom{original_class}')
+            _LOGGER.debug(f'Transformed original_class={original_class} into custom_class={custom_class}')
+            custom_devices.append(custom_class(device))
 
         _LOGGER.debug(f'Calling add_entities({custom_devices}, {update})')
         add_entities(custom_devices, update)
@@ -53,7 +49,8 @@ class CustomOnkyoDevice(OnkyoDevice):
     #     self._device = OnkyoDevice(receiver, sources, name, max_volume, receiver_max_volume)
 
     def __init__(self, onkyo_device):
-        """Initialize the custom Onkyo Receiver."""
+        """Initialize the custom Onkyo Receiver from existing object of class `OnkyoDevice`."""
+        _LOGGER.debug(f'CustomOnkyoDevice(self, {onkyo_device}) called')
         self.__dict__.update(vars(onkyo_device))
 
     # def update(self):
@@ -112,3 +109,26 @@ class CustomOnkyoDevice(OnkyoDevice):
         }
 
         return state_attr
+
+
+class CustomOnkyoDeviceZone(CustomOnkyoDevice, OnkyoDeviceZone):
+    """Representation of a customized Onkyo device's extra zone."""
+
+    # def __init__(
+    #     self,
+    #     zone,
+    #     receiver,
+    #     sources,
+    #     name=None,
+    #     max_volume=SUPPORTED_MAX_VOLUME,
+    #     receiver_max_volume=DEFAULT_RECEIVER_MAX_VOLUME,
+    # ):
+    #     """Initialize the Zone with the zone identifier."""
+    #     self._zone = zone
+    #     self._supports_volume = True
+    #     super().__init__(receiver, sources, name, max_volume, receiver_max_volume)
+
+    def __init__(self, onkyo_device):
+        """Initialize the custom Onkyo Receiver from existing object of class `OnkyoDevice`."""
+        _LOGGER.debug(f'CustomOnkyoDeviceZone(self, {onkyo_device}) called')
+        super().__init__(onkyo_device)
