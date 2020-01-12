@@ -7,19 +7,26 @@ from eiscp import eISCP
 
 from homeassistant.components.media_player import ATTR_TO_PROPERTY
 from homeassistant.components.onkyo.media_player import (
+    determine_zones,
+    setup_platform as onkyo_setup_platform,
     OnkyoDevice,
     OnkyoDeviceZone,
-    setup_platform as onkyo_setup_platform,
-    PLATFORM_SCHEMA as ONKYO_PLATFORM_SCHEMA,
-    SUPPORTED_MAX_VOLUME,
+    CONF_MAX_VOLUME,
+    CONF_RECEIVER_MAX_VOLUME,
+    CONF_SOURCES,
     DEFAULT_RECEIVER_MAX_VOLUME,
-    CONF_SOURCES, CONF_MAX_VOLUME, CONF_RECEIVER_MAX_VOLUME, determine_zones)
-from homeassistant.const import CONF_HOST, CONF_NAME
+    PLATFORM_SCHEMA,
+    SUPPORTED_MAX_VOLUME,
+)
+from homeassistant.const import (
+    CONF_HOST,
+    CONF_NAME,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
 KNOWN_HOSTS: List[str] = []
-PLATFORM_SCHEMA = ONKYO_PLATFORM_SCHEMA.extend({})
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({})
 
 
 def setup_platform(hass, config, add_entities, discovery_info=None):
@@ -113,6 +120,8 @@ class CustomOnkyoDevice(OnkyoDevice):
     ):
         """Initialize the Onkyo Receiver."""
         super().__init__(receiver, sources, name, max_volume, receiver_max_volume)
+        _LOGGER.debug(f'CustomOnkyoDevice _source_list={self._source_list}')
+        self._current_source = self._source_list[0]
 
     # def __init__(self, onkyo_device):
     #     """Initialize the custom Onkyo Receiver from existing object of class `OnkyoDevice`."""
@@ -164,6 +173,27 @@ class CustomOnkyoDevice(OnkyoDevice):
     #     if not hdmi_out_raw:
     #         return
     #     self._attributes["video_out"] = ",".join(hdmi_out_raw[1])
+
+    def get_current_source(self):
+        current_source = self._source_mapping[0]
+
+        current_source_raw = self.command("input-selector query")
+        if not current_source_raw:
+            return
+
+        # eiscp can return string or tuple. Make everything tuples.
+        if isinstance(current_source_raw[1], str):
+            current_source_tuples = (current_source_raw[0], (current_source_raw[1],))
+        else:
+            current_source_tuples = current_source_raw
+
+        for source in current_source_tuples[1]:
+            if source in self._source_mapping:
+                current_source = self._source_mapping[source]
+                break
+            current_source = "_".join(current_source_tuples[1])
+
+        return current_source
 
     @property
     def state_attributes(self):
