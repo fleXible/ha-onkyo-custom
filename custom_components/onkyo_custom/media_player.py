@@ -1,57 +1,123 @@
 """Support for Onkyo Receivers with some customizations."""
 import logging
+from typing import List
+
+import eiscp
+from eiscp import eISCP
 
 from homeassistant.components.media_player import ATTR_TO_PROPERTY
 from homeassistant.components.onkyo.media_player import (
     OnkyoDevice,
     OnkyoDeviceZone,
-    PLATFORM_SCHEMA as ONKYO_PLATFORM_SCHEMA,
     setup_platform as onkyo_setup_platform,
-)
+    PLATFORM_SCHEMA as ONKYO_PLATFORM_SCHEMA,
+    SUPPORTED_MAX_VOLUME,
+    DEFAULT_RECEIVER_MAX_VOLUME,
+    CONF_SOURCES, CONF_MAX_VOLUME, CONF_RECEIVER_MAX_VOLUME, determine_zones)
+from homeassistant.const import CONF_HOST, CONF_NAME
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORM_SCHEMA = ONKYO_PLATFORM_SCHEMA
+KNOWN_HOSTS: List[str] = []
+PLATFORM_SCHEMA = ONKYO_PLATFORM_SCHEMA.extend({})
 
 
 def setup_platform(hass, config, add_entities, discovery_info=None):
-    """Set up the Onkyo custom platform by calling original Onky `setup_platform()`."""
-    _LOGGER.info('Setting up plattform=onkyo_custom')
+    """Set up the Onkyo platform."""
+    host = config.get(CONF_HOST)
+    hosts = []
 
-    def super_add_entities(devices, update=False):
-        """Helper function to transform devices to our customized code."""
-        custom_devices = []
+    if CONF_HOST in config and host not in KNOWN_HOSTS:
+        try:
+            receiver = eiscp.eISCP(host)
+            hosts.append(
+                CustomOnkyoDevice(
+                    receiver,
+                    config.get(CONF_SOURCES),
+                    name=config.get(CONF_NAME),
+                    max_volume=config.get(CONF_MAX_VOLUME),
+                    receiver_max_volume=config.get(CONF_RECEIVER_MAX_VOLUME),
+                )
+            )
+            KNOWN_HOSTS.append(host)
 
-        for device in devices:
-            original_class = device.__class__.__name__
-            custom_class = globals().get(f'Custom{original_class}')
-            _LOGGER.debug(f'Transformed original_class={original_class} into custom_class={custom_class}')
-            custom_devices.append(custom_class(device))
+            # zones = determine_zones(receiver)
+            zones = {"zone2": False, "zone3": False}
 
-        _LOGGER.debug(f'Calling add_entities({custom_devices}, {update})')
-        add_entities(custom_devices, update)
+            # Add Zone2 if available
+            if zones["zone2"]:
+                _LOGGER.debug("Setting up zone 2")
+                hosts.append(
+                    CustomOnkyoDeviceZone(
+                        "2",
+                        receiver,
+                        config.get(CONF_SOURCES),
+                        name=f"{config[CONF_NAME]} Zone 2",
+                        max_volume=config.get(CONF_MAX_VOLUME),
+                        receiver_max_volume=config.get(CONF_RECEIVER_MAX_VOLUME),
+                    )
+                )
+            # Add Zone3 if available
+            if zones["zone3"]:
+                _LOGGER.debug("Setting up zone 3")
+                hosts.append(
+                    CustomOnkyoDeviceZone(
+                        "3",
+                        receiver,
+                        config.get(CONF_SOURCES),
+                        name=f"{config[CONF_NAME]} Zone 3",
+                        max_volume=config.get(CONF_MAX_VOLUME),
+                        receiver_max_volume=config.get(CONF_RECEIVER_MAX_VOLUME),
+                    )
+                )
+        except OSError:
+            _LOGGER.error("Unable to connect to receiver at %s", host)
+    else:
+        for receiver in eISCP.discover():
+            if receiver.host not in KNOWN_HOSTS:
+                hosts.append(CustomOnkyoDevice(receiver, config.get(CONF_SOURCES)))
+                KNOWN_HOSTS.append(receiver.host)
+    add_entities(hosts, True)
 
-    onkyo_setup_platform(hass, config, super_add_entities, discovery_info)
+
+# def setup_platform(hass, config, add_entities, discovery_info=None):
+#     """Set up the Onkyo custom platform by calling original Onky `setup_platform()`."""
+#     _LOGGER.info('Setting up plattform=onkyo_custom')
+#
+#     def super_add_entities(devices, update=False):
+#         """Helper function to transform devices to our customized code."""
+#         custom_devices = []
+#
+#         for device in devices:
+#             original_class = device.__class__.__name__
+#             custom_class = globals().get(f'Custom{original_class}')
+#             _LOGGER.debug(f'Transformed original_class={original_class} into custom_class={custom_class}')
+#             custom_devices.append(custom_class(device))
+#
+#         _LOGGER.debug(f'Calling add_entities({custom_devices}, {update})')
+#         add_entities(custom_devices, update)
+#
+#     onkyo_setup_platform(hass, config, super_add_entities, discovery_info)
 
 
 class CustomOnkyoDevice(OnkyoDevice):
     """Representation of a customized Onkyo device."""
 
-    # def __init__(
-    #     self,
-    #     receiver,
-    #     sources,
-    #     name=None,
-    #     max_volume=SUPPORTED_MAX_VOLUME,
-    #     receiver_max_volume=DEFAULT_RECEIVER_MAX_VOLUME,
-    # ):
-    #     """Initialize the Onkyo Receiver."""
-    #     self._device = OnkyoDevice(receiver, sources, name, max_volume, receiver_max_volume)
+    def __init__(
+        self,
+        receiver,
+        sources,
+        name=None,
+        max_volume=SUPPORTED_MAX_VOLUME,
+        receiver_max_volume=DEFAULT_RECEIVER_MAX_VOLUME,
+    ):
+        """Initialize the Onkyo Receiver."""
+        super().__init__(receiver, sources, name, max_volume, receiver_max_volume)
 
-    def __init__(self, onkyo_device):
-        """Initialize the custom Onkyo Receiver from existing object of class `OnkyoDevice`."""
-        _LOGGER.debug(f'CustomOnkyoDevice(self, {onkyo_device}) called')
-        self.__dict__.update(vars(onkyo_device))
+    # def __init__(self, onkyo_device):
+    #     """Initialize the custom Onkyo Receiver from existing object of class `OnkyoDevice`."""
+    #     _LOGGER.debug(f'CustomOnkyoDevice(self, {onkyo_device}) called')
+    #     self.__dict__.update(vars(onkyo_device))
 
     # def update(self):
     #     """Get the latest state from the device."""
@@ -114,21 +180,21 @@ class CustomOnkyoDevice(OnkyoDevice):
 class CustomOnkyoDeviceZone(CustomOnkyoDevice, OnkyoDeviceZone):
     """Representation of a customized Onkyo device's extra zone."""
 
-    # def __init__(
-    #     self,
-    #     zone,
-    #     receiver,
-    #     sources,
-    #     name=None,
-    #     max_volume=SUPPORTED_MAX_VOLUME,
-    #     receiver_max_volume=DEFAULT_RECEIVER_MAX_VOLUME,
-    # ):
-    #     """Initialize the Zone with the zone identifier."""
-    #     self._zone = zone
-    #     self._supports_volume = True
-    #     super().__init__(receiver, sources, name, max_volume, receiver_max_volume)
+    def __init__(
+        self,
+        zone,
+        receiver,
+        sources,
+        name=None,
+        max_volume=SUPPORTED_MAX_VOLUME,
+        receiver_max_volume=DEFAULT_RECEIVER_MAX_VOLUME,
+    ):
+        """Initialize the Zone with the zone identifier."""
+        self._zone = zone
+        self._supports_volume = True
+        super(CustomOnkyoDevice, self).__init__(receiver, sources, name, max_volume, receiver_max_volume)
 
-    def __init__(self, onkyo_device):
-        """Initialize the custom Onkyo Receiver from existing object of class `OnkyoDevice`."""
-        _LOGGER.debug(f'CustomOnkyoDeviceZone(self, {onkyo_device}) called')
-        super().__init__(onkyo_device)
+    # def __init__(self, onkyo_device):
+    #     """Initialize the custom Onkyo Receiver from existing object of class `OnkyoDevice`."""
+    #     _LOGGER.debug(f'CustomOnkyoDeviceZone(self, {onkyo_device}) called')
+    #     super().__init__(onkyo_device)
