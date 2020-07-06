@@ -2,7 +2,6 @@
   "domain": "onkyo_custom",
   "name": "Onkyo Custom",
   "documentation": "https://github.com/fleXible/ha-onkyo-custom",
-  "dependencies": ["onkyo"],
   "codeowners": ["@fleXible"],
-  "requirements": []
+  "requirements": ["onkyo-eiscp"]
 }
