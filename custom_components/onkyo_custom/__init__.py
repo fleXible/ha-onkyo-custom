@@ -15,9 +15,9 @@ async def async_setup(hass, config):
 
     onkyo_mp.determine_zones = determine_zones
     _LOGGER.debug(
-        "Patched <function determine_zones, file \"%s\"> with %s",
-        onkyo_mp.__file__,
-        onkyo_mp.determine_zones.__code__,
+        'Patched <function determine_zones, file "%s"> with %s',
+        __file__,
+        determine_zones.__code__,
     )
 
     return True
