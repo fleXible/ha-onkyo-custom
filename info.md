@@ -10,6 +10,10 @@ This is a modified version of the built-in
 [onkyo](https://www.home-assistant.io/integrations/onkyo/) integration with these changes:
 
 * All zones offered by onkyo device are disabled in HomeAssistent and won't show up as entities
+* Populate state attributes when device is off
+  * Fixes `Homekit` warning `"Sources out of sync. Restart Home Assistant"`
+  * Set *"Hardware" - "Power Management" - "Network Standby"* to *"On"* for `source` property to be set correctly.
+    If set to *"Off"*, last known value is used
 
 ## Configuration
 
@@ -28,5 +32,3 @@ media_player:
 ```
  
 For further documentation, consult the official HomeAssistant [onkyo](https://www.home-assistant.io/integrations/onkyo/) pages.
-
-***
