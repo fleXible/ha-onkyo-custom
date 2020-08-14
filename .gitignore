@@ -61,3 +61,4 @@
 
 # ignore LLVM Code Coverage
 default.profraw
+custom_components/onkyo_custom/.vscode
