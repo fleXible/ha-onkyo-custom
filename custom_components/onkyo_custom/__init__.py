@@ -139,4 +139,38 @@ async def async_setup(hass, config):
         state_attributes.__code__,
     )
 
+    """Customizations for scene component
+    """
+    import json
+    from homeassistant.components.homeassistant.scene import HomeAssistantScene
+    from homeassistant.helpers.json import JSONEncoder
+
+    scene_LOGGER = logging.getLogger(HomeAssistantScene.__module__)
+
+    def device_state_attributes(orig_property):
+        # noinspection PyProtectedMember
+        def wrapper(self):
+            scene_LOGGER.debug(
+                f"{self.name}: Patched device_state_attributes() called"
+            )
+            attributes = orig_property.fget(self)
+            saved_states = {
+                state.entity_id: state.state
+                for state in self.scene_config.states.values()
+            }
+            attributes["saved_states"] = json.dumps(saved_states, cls=JSONEncoder)
+            scene_LOGGER.debug(f"{self.name}: returning attributes={attributes}")
+
+            return attributes
+
+        return property(wrapper, orig_property.fset, orig_property.fdel)
+
+    # noinspection PyPropertyAccess
+    HomeAssistantScene.device_state_attributes = device_state_attributes(
+        HomeAssistantScene.device_state_attributes
+    )
+    scene_LOGGER.info(
+        "Patched class=HomeAssistantScene, property=device_state_attributes sucessfully."
+    )
+
     return True
