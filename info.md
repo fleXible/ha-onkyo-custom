@@ -3,10 +3,10 @@
 
 # HomeAssistant - Onkyo Custom Component
 
-This is a custom component to allow control of Onkyo, Integra and some recent Pioneer devices in 
+This is a custom component to allow control of Onkyo, Integra and some recent Pioneer devices in
 [HomeAssistant](https://home-assistant.io).
 
-This is a modified version of the built-in 
+This is a modified version of the built-in
 [onkyo](https://www.home-assistant.io/integrations/onkyo/) integration with these changes:
 
 * All zones offered by onkyo device are disabled in HomeAssistent and won't show up as entities
@@ -24,11 +24,11 @@ Activate module by adding the line `onkyo_custom:` anywhere before your media_pl
 onkyo_custom:
 
 media_player:
-  - platform: onkyo_custom
+  - platform: onkyo
     host: 192.168.1.2
     name: receiver
     sources:
       pc: 'HTPC'
 ```
- 
+
 For further documentation, consult the official HomeAssistant [onkyo](https://www.home-assistant.io/integrations/onkyo/) pages.
