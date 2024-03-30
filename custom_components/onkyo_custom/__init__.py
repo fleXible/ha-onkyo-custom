@@ -1,5 +1,6 @@
 """The onkyo_custom component."""
 import logging
+from typing import Type
 
 import homeassistant.components.onkyo.media_player as onkyo_mp
 from homeassistant.const import STATE_OFF, STATE_ON
@@ -145,32 +146,31 @@ async def async_setup(hass, config):
     from homeassistant.components.homeassistant.scene import HomeAssistantScene
     from homeassistant.helpers.json import JSONEncoder
 
-    scene_LOGGER = logging.getLogger(HomeAssistantScene.__module__)
+    _scene_LOGGER = logging.getLogger(HomeAssistantScene.__module__)
 
-    def device_state_attributes(orig_property):
+    def patch_HomeAssistantScene(scene_class: Type[HomeAssistantScene]):
         # noinspection PyProtectedMember
+
+        # In older HomeAssistant versions, `extra_state_attributes` was called `device_state_attributes`
+        if hasattr(scene_class, "device_state_attributes"):
+            orig_property = scene_class.device_state_attributes
+        else:
+            orig_property = scene_class.extra_state_attributes
+        property_name = orig_property.fget.__name__
+
         def wrapper(self):
-            scene_LOGGER.debug(
-                f"{self.name}: Patched device_state_attributes() called"
-            )
+            _scene_LOGGER.debug(f"{self.name}: Patched {property_name} called")
+
             attributes = orig_property.fget(self)
-            saved_states = {
-                state.entity_id: state.state
-                for state in self.scene_config.states.values()
-            }
+            saved_states = {state.entity_id: state.state for state in self.scene_config.states.values()}
             attributes["saved_states"] = json.dumps(saved_states, cls=JSONEncoder)
-            scene_LOGGER.debug(f"{self.name}: returning attributes={attributes}")
+            _scene_LOGGER.debug(f"{self.name}: returning attributes={attributes}")
 
             return attributes
 
-        return property(wrapper, orig_property.fset, orig_property.fdel)
+        setattr(scene_class, property_name, property(wrapper, orig_property.fset, orig_property.fdel))
+        _scene_LOGGER.info(f"Patched class={scene_class.__name__}, property={property_name} sucessfully.")
 
-    # noinspection PyPropertyAccess
-    HomeAssistantScene.device_state_attributes = device_state_attributes(
-        HomeAssistantScene.device_state_attributes
-    )
-    scene_LOGGER.info(
-        "Patched class=HomeAssistantScene, property=device_state_attributes sucessfully."
-    )
+    patch_HomeAssistantScene(HomeAssistantScene)
 
     return True
